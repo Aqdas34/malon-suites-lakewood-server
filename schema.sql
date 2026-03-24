@@ -11,6 +11,19 @@ CREATE TABLE IF NOT EXISTS suites (
     images JSONB DEFAULT '[]',
     rating DECIMAL(2, 1) DEFAULT 4.5,
     reviews INTEGER DEFAULT 0,
+    address TEXT,
+    location_info TEXT,
+    map_embed TEXT,
+    price_weekday_one DECIMAL(10, 2),
+    price_weekday_multiple DECIMAL(10, 2),
+    price_shabbos DECIMAL(10, 2),
+    price_motzei_shabbos DECIMAL(10, 2),
+    price_weekly DECIMAL(10, 2),
+    price_monthly DECIMAL(10, 2),
+    check_in_info TEXT,
+    check_out_info TEXT,
+    house_rules TEXT,
+    cancellation_policy TEXT,
     created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
 );
 
@@ -59,3 +72,15 @@ INSERT INTO suites (id, title, base_price, amenities, images) VALUES
 INSERT INTO discounts (type, threshold, percentage) VALUES
 ('multiple_nights', 3, 10.00), -- 10% off for 3+ nights
 ('monthly', 28, 25.00);      -- 25% off for 28+ nights
+
+-- 7. Create Contacts Table (Guest Inquiries)
+CREATE TABLE IF NOT EXISTS contacts (
+    id SERIAL PRIMARY KEY,
+    first_name TEXT NOT NULL,
+    last_name TEXT NOT NULL,
+    email TEXT NOT NULL,
+    mobile TEXT NOT NULL,
+    message TEXT NOT NULL,
+    status TEXT DEFAULT 'pending', -- 'pending', 'read', 'replied'
+    created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
+);

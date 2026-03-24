@@ -1,0 +1,37 @@
+name: Deploy Malon Backend to VPS
+
+on:
+  push:
+    branches:
+      - main # Change this if your branch name is different
+
+jobs:
+  deploy-backend:
+    runs-on: ubuntu-latest
+    
+    steps:
+    - name: Deploy Backend via SSH
+      uses: appleboy/ssh-action@master
+      env:
+        SERVER_ENV: ${{ secrets.ENV_FILE }}
+      with:
+        host: ${{ secrets.VPS_HOST }}
+        username: ${{ secrets.VPS_USERNAME }}
+        key: ${{ secrets.VPS_SSH_KEY }}
+        envs: SERVER_ENV
+        script: |
+          # 1. Navigate to where you clone your project on the VPS
+          cd /var/www/malon-server # CHANGE THIS path appropriately
+          
+          # 2. Automatically Generate the .env file from GitHub Secrets!
+          echo "$SERVER_ENV" > .env
+          
+          # 3. Pull the latest code from GitHub
+          git pull origin main
+          
+          # 4. Install any new dependencies
+          npm install
+          
+          # 5. Restart the live backend process without downtime
+          pm2 restart "malon-backend" || pm2 start index.js --name "malon-backend"
+          pm2 save
