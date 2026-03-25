@@ -41,15 +41,18 @@ const runMigration = async () => {
       );
 
       CREATE TABLE IF NOT EXISTS bookings (
-          id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+          id SERIAL PRIMARY KEY,
+          first_name TEXT NOT NULL,
+          last_name TEXT NOT NULL,
+          email TEXT NOT NULL,
+          mobile TEXT NOT NULL,
           suite_id TEXT REFERENCES suites(id),
-          start_date DATE NOT NULL,
-          end_date DATE NOT NULL,
+          check_in DATE NOT NULL,
+          check_out DATE NOT NULL,
+          breakfast_dates JSONB,
           total_cost DECIMAL(10, 2) NOT NULL,
-          extras JSONB,
           status TEXT DEFAULT 'pending',
-          created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
-          customer_info JSONB
+          created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
       );
 
       CREATE TABLE IF NOT EXISTS blocked_dates (
@@ -73,9 +76,9 @@ const runMigration = async () => {
 
       CREATE TABLE IF NOT EXISTS discounts (
           id SERIAL PRIMARY KEY,
-          code TEXT UNIQUE NOT NULL,
+          type TEXT NOT NULL,
+          threshold DECIMAL(10, 2),
           percentage DECIMAL(5,2) NOT NULL,
-          valid_until DATE,
           is_active BOOLEAN DEFAULT true
       );
 
