@@ -28,9 +28,9 @@ const pool = new Pool({
 const runMigration = async () => {
   try {
     console.log("Checking and generating missing tables...");
+    
+    // 1. Create all base tables safely
     await pool.query(`
-      CREATE EXTENSION IF NOT EXISTS pgcrypto;
-
       CREATE TABLE IF NOT EXISTS suites (
           id TEXT PRIMARY KEY,
           title TEXT NOT NULL,
@@ -60,21 +60,6 @@ const runMigration = async () => {
           UNIQUE(suite_id, blocked_date)
       );
 
-      ALTER TABLE suites 
-      ADD COLUMN IF NOT EXISTS address TEXT,
-      ADD COLUMN IF NOT EXISTS location_info TEXT,
-      ADD COLUMN IF NOT EXISTS map_embed TEXT,
-      ADD COLUMN IF NOT EXISTS price_weekday_one DECIMAL(10, 2),
-      ADD COLUMN IF NOT EXISTS price_weekday_multiple DECIMAL(10, 2),
-      ADD COLUMN IF NOT EXISTS price_shabbos DECIMAL(10, 2),
-      ADD COLUMN IF NOT EXISTS price_motzei_shabbos DECIMAL(10, 2),
-      ADD COLUMN IF NOT EXISTS price_weekly DECIMAL(10, 2),
-      ADD COLUMN IF NOT EXISTS price_monthly DECIMAL(10, 2),
-      ADD COLUMN IF NOT EXISTS check_in_info TEXT,
-      ADD COLUMN IF NOT EXISTS check_out_info TEXT,
-      ADD COLUMN IF NOT EXISTS house_rules TEXT,
-      ADD COLUMN IF NOT EXISTS cancellation_policy TEXT;
-
       CREATE TABLE IF NOT EXISTS contacts (
           id SERIAL PRIMARY KEY,
           first_name TEXT NOT NULL,
@@ -98,6 +83,24 @@ const runMigration = async () => {
           key TEXT PRIMARY KEY,
           value TEXT
       );
+    `);
+
+    // 2. Perform Alters on Suites if needed
+    await pool.query(`
+      ALTER TABLE suites 
+      ADD COLUMN IF NOT EXISTS address TEXT,
+      ADD COLUMN IF NOT EXISTS location_info TEXT,
+      ADD COLUMN IF NOT EXISTS map_embed TEXT,
+      ADD COLUMN IF NOT EXISTS price_weekday_one DECIMAL(10, 2),
+      ADD COLUMN IF NOT EXISTS price_weekday_multiple DECIMAL(10, 2),
+      ADD COLUMN IF NOT EXISTS price_shabbos DECIMAL(10, 2),
+      ADD COLUMN IF NOT EXISTS price_motzei_shabbos DECIMAL(10, 2),
+      ADD COLUMN IF NOT EXISTS price_weekly DECIMAL(10, 2),
+      ADD COLUMN IF NOT EXISTS price_monthly DECIMAL(10, 2),
+      ADD COLUMN IF NOT EXISTS check_in_info TEXT,
+      ADD COLUMN IF NOT EXISTS check_out_info TEXT,
+      ADD COLUMN IF NOT EXISTS house_rules TEXT,
+      ADD COLUMN IF NOT EXISTS cancellation_policy TEXT;
     `);
     
     // Seed default settings if they don't exist
