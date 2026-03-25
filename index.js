@@ -27,8 +27,39 @@ const pool = new Pool({
 // Auto-migration for missing columns
 const runMigration = async () => {
   try {
-    console.log("Checking for missing columns...");
+    console.log("Checking and generating missing tables...");
     await pool.query(`
+      CREATE EXTENSION IF NOT EXISTS pgcrypto;
+
+      CREATE TABLE IF NOT EXISTS suites (
+          id TEXT PRIMARY KEY,
+          title TEXT NOT NULL,
+          description TEXT,
+          base_price DECIMAL(10, 2) NOT NULL,
+          amenities JSONB,
+          images JSONB
+      );
+
+      CREATE TABLE IF NOT EXISTS bookings (
+          id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+          suite_id TEXT REFERENCES suites(id),
+          start_date DATE NOT NULL,
+          end_date DATE NOT NULL,
+          total_cost DECIMAL(10, 2) NOT NULL,
+          extras JSONB,
+          status TEXT DEFAULT 'pending',
+          created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
+          customer_info JSONB
+      );
+
+      CREATE TABLE IF NOT EXISTS blocked_dates (
+          id SERIAL PRIMARY KEY,
+          suite_id TEXT REFERENCES suites(id) ON DELETE CASCADE,
+          blocked_date DATE NOT NULL,
+          reason TEXT,
+          UNIQUE(suite_id, blocked_date)
+      );
+
       ALTER TABLE suites 
       ADD COLUMN IF NOT EXISTS address TEXT,
       ADD COLUMN IF NOT EXISTS location_info TEXT,
@@ -53,6 +84,14 @@ const runMigration = async () => {
           message TEXT NOT NULL,
           status TEXT DEFAULT 'pending',
           created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
+      );
+
+      CREATE TABLE IF NOT EXISTS discounts (
+          id SERIAL PRIMARY KEY,
+          code TEXT UNIQUE NOT NULL,
+          percentage DECIMAL(5,2) NOT NULL,
+          valid_until DATE,
+          is_active BOOLEAN DEFAULT true
       );
 
       CREATE TABLE IF NOT EXISTS global_settings (
