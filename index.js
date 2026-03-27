@@ -28,7 +28,7 @@ const pool = new Pool({
 const runMigration = async () => {
   try {
     console.log("Checking and generating missing tables...");
-    
+
     // 1. Create all base tables safely
     await pool.query(`
       CREATE TABLE IF NOT EXISTS suites (
@@ -52,6 +52,8 @@ const runMigration = async () => {
           breakfast_dates JSONB,
           total_cost DECIMAL(10, 2) NOT NULL,
           status TEXT DEFAULT 'pending',
+          extras JSONB,
+          notes TEXT,
           created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
       );
 
@@ -104,8 +106,13 @@ const runMigration = async () => {
       ADD COLUMN IF NOT EXISTS check_out_info TEXT,
       ADD COLUMN IF NOT EXISTS house_rules TEXT,
       ADD COLUMN IF NOT EXISTS cancellation_policy TEXT;
+
+      ALTER TABLE bookings
+      ADD COLUMN IF NOT EXISTS extras JSONB,
+      ADD COLUMN IF NOT EXISTS notes TEXT,
+      ADD COLUMN IF NOT EXISTS payment_intent_id TEXT;
     `);
-    
+
     // Seed default settings if they don't exist
     const defaults = [
       ['check_in_time', '5:00 PM'],
@@ -118,7 +125,7 @@ const runMigration = async () => {
     }
 
     console.log("Database schema is up to date.");
-    
+
     // Ensure initial suites exist
     const { rowCount } = await pool.query('SELECT * FROM suites');
     if (rowCount === 0) {
@@ -137,6 +144,16 @@ const runMigration = async () => {
 };
 runMigration();
 
+// --- GLOBAL NODEMAILER INITIALIZATION ---
+const nodemailer = require('nodemailer');
+const transporter = nodemailer.createTransport({
+  service: 'gmail',
+  auth: {
+    user: process.env.ADMIN_EMAIL,
+    pass: process.env.ADMIN_EMAIL_PASS
+  }
+});
+
 // Multer Storage Configuration
 const storage = multer.diskStorage({
   destination: (req, file, cb) => {
@@ -150,6 +167,82 @@ const storage = multer.diskStorage({
 const upload = multer({ storage: storage });
 
 app.use(cors());
+
+// --- STRIPE SECURE WEBHOOK (Must be RAW body, so it stays ABOVE express.json!) ---
+app.post('/api/webhook', express.raw({ type: 'application/json' }), async (req, res) => {
+  const sig = req.headers['stripe-signature'];
+  let event;
+
+  try {
+    // This requires the STRIPE_WEBHOOK_SECRET inside your backend .env folder (Starts with "whsec_...")
+    event = require('stripe')(process.env.STRIPE_SECRET_KEY).webhooks.constructEvent(
+      req.body,
+      sig,
+      process.env.STRIPE_WEBHOOK_SECRET
+    );
+  } catch (err) {
+    console.error(`⚠️ Webhook signature verification failed.`, err.message);
+    return res.status(400).send(`Webhook Error: ${err.message}`);
+  }
+
+  // Handle the incredibly powerful webhook events asynchronously!
+  switch (event.type) {
+    case 'payment_intent.succeeded':
+      const paymentIntent = event.data.object;
+      console.log(`💰 Beautiful! Stripe Webhook intercepted! Payment for $${paymentIntent.amount / 100} was fully settled!`);
+
+      const { booking_id, first_name, last_name, email, phone, suite_id, check_in, check_out } = paymentIntent.metadata || {};
+
+      try {
+        // --- 1. SECURELY UPDATE THE DATABASE STATUS TO PAID ---
+        if (booking_id) {
+          await db.query('UPDATE bookings SET status = $1, payment_intent_id = $2 WHERE id = $3', ['paid', paymentIntent.id, booking_id]);
+          console.log(`✅ Booking #${booking_id} updated to PAID in Database!`);
+        }
+
+        // --- 2. FIRE THE ADMINISTRATIVE NOTIFICATION ---
+/* 
+        if (process.env.ADMIN_EMAIL && process.env.ADMIN_EMAIL_PASS && first_name) {
+          transporter.sendMail({
+            from: `Malon Booking System <${process.env.ADMIN_EMAIL}>`,
+            to: process.env.ADMIN_EMAIL,
+            replyTo: email,
+            subject: `🎉 NEW SECURE BOOKING: ${suite_id} by ${first_name} ${last_name}!`,
+            html: `
+              <div style="font-family: sans-serif; color: #333; max-width: 600px; padding: 20px; border: 1px solid #eee; border-radius: 5px;">
+                <h2 style="color: #A68A57; border-bottom: 2px solid #A68A57; padding-bottom: 10px;">Payment Confirmed via Stripe Webhook!</h2>
+                <p><strong>Suite:</strong> ${suite_id}</p>
+                <p><strong>Customer:</strong> ${first_name} ${last_name}</p>
+                <p><strong>Email:</strong> ${email}</p>
+                <p><strong>Phone:</strong> ${phone}</p>
+                <p><strong>Dates:</strong> ${check_in} to ${check_out}</p>
+                <p><strong>Total Paid:</strong> $${(paymentIntent.amount / 100).toFixed(2)}</p>
+                <br/>
+                <p style="font-size: 13px; color: #666; font-style: italic;">
+                  Verified receipt via Stripe. Funds have cleanly settled.
+                </p>
+              </div>
+            `
+          }).catch(err => console.error("Webhook Email Delivery Failed:", err.message));
+        }
+        */
+      } catch (err) {
+        console.error("Webhook Processing Error:", err.message);
+      }
+      break;
+
+    case 'payment_intent.payment_failed':
+      console.log(`❌ Payment visually failed! The customer's card was declined.`);
+      break;
+
+    default:
+      console.log(`Unhandled Stripe Event: ${event.type}`);
+  }
+
+  // Return a 200 response to acknowledge receipt to Stripe's mainframe
+  res.send();
+});
+
 app.use(express.json());
 app.use('/uploads', express.static(path.join(__dirname, 'uploads')));
 
@@ -176,7 +269,7 @@ const parseNumeric = (val) => {
 };
 
 app.post('/api/suites', async (req, res) => {
-  const { 
+  const {
     id, title, description, base_price, amenities, images, address, location_info, map_embed,
     price_weekday_one, price_weekday_multiple, price_shabbos, price_motzei_shabbos, price_weekly, price_monthly,
     check_in_info, check_out_info, house_rules, cancellation_policy
@@ -202,7 +295,7 @@ app.post('/api/suites', async (req, res) => {
 });
 
 app.put('/api/suites/:id', async (req, res) => {
-  const { 
+  const {
     title, description, base_price, amenities, images, address, location_info, map_embed,
     price_weekday_one, price_weekday_multiple, price_shabbos, price_motzei_shabbos, price_weekly, price_monthly,
     check_in_info, check_out_info, house_rules, cancellation_policy
@@ -307,12 +400,24 @@ app.get('/api/bookings', async (req, res) => {
 });
 
 app.post('/api/bookings', async (req, res) => {
-  const { first_name, last_name, email, mobile, suite_id, check_in, check_out, breakfast_dates, total_cost } = req.body;
+  const {
+    first_name, last_name, email, mobile, suite_id, check_in, check_out,
+    breakfast_dates, total_cost, status, extras, notes
+  } = req.body;
+
   try {
     const { rows } = await db.query(
-      'INSERT INTO bookings (first_name, last_name, email, mobile, suite_id, check_in, check_out, breakfast_dates, total_cost) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9) RETURNING *',
-      [first_name, last_name, email, mobile, suite_id, check_in, check_out, JSON.stringify(breakfast_dates), total_cost]
+      `INSERT INTO bookings (
+        first_name, last_name, email, mobile, suite_id, check_in, check_out, 
+        breakfast_dates, total_cost, status, extras, notes
+      ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12) RETURNING *`,
+      [
+        first_name, last_name, email, mobile, suite_id, check_in, check_out,
+        JSON.stringify(breakfast_dates), total_cost, status || 'pending',
+        extras, notes
+      ]
     );
+
     res.status(201).json(rows[0]);
   } catch (err) {
     console.error(`API ERROR [${req.method} ${req.path}]:`, err.message);
@@ -411,11 +516,11 @@ app.get('/api/settings', async (req, res) => {
 app.post('/api/settings', async (req, res) => {
   const settings = req.body;
   try {
-    const queries = Object.entries(settings).map(([key, value]) => 
+    const queries = Object.entries(settings).map(([key, value]) =>
       db.query('INSERT INTO global_settings (key, value) VALUES ($1, $2) ON CONFLICT (key) DO NOTHING UPDATE SET value = EXCLUDED.value', [key, value])
     );
     // Wait, ON CONFLICT DO UPDATE needs right syntax
-    const upsertQueries = Object.entries(settings).map(([key, value]) => 
+    const upsertQueries = Object.entries(settings).map(([key, value]) =>
       db.query('INSERT INTO global_settings (key, value) VALUES ($1, $2) ON CONFLICT (key) DO UPDATE SET value = $2', [key, value])
     );
     await Promise.all(upsertQueries);
@@ -431,6 +536,43 @@ app.post('/api/upload', upload.single('image'), (req, res) => {
   if (!req.file) return res.status(400).json({ error: 'No image uploaded' });
   const imageUrl = `${req.protocol}://${req.get('host')}/uploads/${req.file.filename}`;
   res.json({ url: imageUrl });
+});
+
+// --- STRIPE PAYMENTS API ---
+const stripe = require('stripe')(process.env.STRIPE_SECRET_KEY || 'sk_test_placeholder');
+
+app.post('/api/create-payment-intent', async (req, res) => {
+  const { total_cost, suite_id, first_name, last_name, email, phone, check_in, check_out, booking_id } = req.body;
+
+  if (!total_cost || total_cost <= 0) {
+    return res.status(400).json({ error: 'Invalid checkout amount' });
+  }
+
+  try {
+    const paymentIntent = await stripe.paymentIntents.create({
+      amount: Math.round(total_cost * 100),
+      currency: 'usd',
+      metadata: {
+        booking_id, // CRITICAL: Link this intent directly back to our database record!
+        suite_id,
+        first_name,
+        last_name,
+        email,
+        phone,
+        check_in,
+        check_out
+      },
+      automatic_payment_methods: {
+        enabled: true,
+      },
+    });
+
+    // We MUST hand the frontend this exact random client_secret so it natively knows how to unlock the generic card reader box!
+    res.send({ clientSecret: paymentIntent.client_secret });
+  } catch (err) {
+    console.error(`STRIPE ERROR:`, err.message);
+    res.status(500).json({ error: err.message });
+  }
 });
 
 app.listen(PORT, () => {
