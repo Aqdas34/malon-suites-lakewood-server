@@ -194,6 +194,15 @@ const sendConfirmationEmail = async (data) => {
   } = data;
 
   const isGift = type === 'gift';
+  let displaySuiteTitle = suiteTitle;
+  try {
+    const suiteLookup = await db.query('SELECT title FROM suites WHERE id = $1 LIMIT 1', [suiteTitle]);
+    if (suiteLookup.rows.length > 0 && suiteLookup.rows[0].title) {
+      displaySuiteTitle = suiteLookup.rows[0].title;
+    }
+  } catch (e) {
+    // Keep original suiteTitle if lookup fails
+  }
   
   // Parse Extras for the email body
   let extrasList = [];
@@ -203,8 +212,8 @@ const sendConfirmationEmail = async (data) => {
     if (ex.deluxe_breakfast) extrasList.push("Deluxe Breakfast Package");
     if (ex.shabbos_package) extrasList.push("Shabbos Catering Package");
     if (ex.full_shabbos) extrasList.push("Full Shabbos Package");
-    if (ex.late_checkout_1) extrasList.push("Late Checkout (1:00 PM)");
-    if (ex.late_checkout_2) extrasList.push("Late Checkout (3:00 PM)");
+    if (ex.late_checkout_1) extrasList.push("Late Checkout (12:00 PM)");
+    if (ex.late_checkout_2) extrasList.push("Late Checkout (1:00 PM)");
   }
 
   const logoUrl = "https://malon-suites.com/assets/images/malon-logo.png"; // Update with actual live logo URL
@@ -220,7 +229,7 @@ const sendConfirmationEmail = async (data) => {
       
       <h2 style="font-size: 20px; font-weight: normal; margin-bottom: 20px; color: #1a1a1a;">Confirmation of ${isGift ? 'Gift Purchase' : 'Stay'}</h2>
       <p>Dear ${firstName} ${lastName},</p>
-      <p>Thank you for choosing Malon Luxury Suites. We are delighted to confirm your ${isGift ? 'gift purchase' : 'booking'} at <strong>${suiteTitle}</strong>.</p>
+      <p>Thank you for choosing Malon Luxury Suites. We are delighted to confirm your ${isGift ? 'gift purchase' : 'booking'} at <strong>${displaySuiteTitle}</strong>.</p>
       
       <div style="background-color: #fcf9f2; padding: 30px; margin: 30px 0; border-radius: 4px; border: 1px solid #f0e6d2;">
         <h3 style="margin-top: 0; color: #9B804E; font-size: 13px; text-transform: uppercase; letter-spacing: 1px; border-bottom: 1px solid #f0e6d2; padding-bottom: 10px; margin-bottom: 15px;">Reservation Summary</h3>
@@ -228,7 +237,7 @@ const sendConfirmationEmail = async (data) => {
         <table style="width: 100%; font-size: 14px;">
           <tr>
             <td style="padding: 5px 0; color: #666; width: 120px;">Location:</td>
-            <td style="padding: 5px 0; font-weight: bold;">${suiteTitle}</td>
+            <td style="padding: 5px 0; font-weight: bold;">${displaySuiteTitle}</td>
           </tr>
           ${!isGift ? `
           <tr>
@@ -311,7 +320,7 @@ const sendConfirmationEmail = async (data) => {
     await transporter.sendMail({
       from: `"Malon Luxury Suites" <${process.env.ADMIN_EMAIL}>`,
       to: email,
-      subject: isGift ? `Receipt: Your Gift to ${giftRecipientName}` : `Confirmation: Your Stay at ${suiteTitle}`,
+      subject: isGift ? `Receipt: Your Gift to ${giftRecipientName}` : `Confirmation: Your Stay at ${displaySuiteTitle}`,
       html: buyerTemplate
     });
 
@@ -330,12 +339,12 @@ const sendConfirmationEmail = async (data) => {
       await transporter.sendMail({
         from: `"Malon System" <${process.env.ADMIN_EMAIL}>`,
         to: dynamicAdminEmail,
-        subject: `🎉 New ${isGift ? 'Gift' : 'Booking'} Received: ${suiteTitle}`,
+        subject: `🎉 New ${isGift ? 'Gift' : 'Booking'} Received: ${displaySuiteTitle}`,
         html: `
           <div style="font-family: sans-serif; padding: 20px; border: 1px solid #eee;">
             <h2 style="color: #9B804E;">New Order Received</h2>
             <p><strong>Customer:</strong> ${firstName} ${lastName}</p>
-            <p><strong>Location:</strong> ${suiteTitle}</p>
+            <p><strong>Location:</strong> ${displaySuiteTitle}</p>
             <p><strong>Total:</strong> $${totalCost}</p>
             ${extrasList.length > 0 ? `<p><strong>Extras:</strong> ${extrasList.join(', ')}</p>` : ''}
             <p>Please check the admin dashboard for full details.</p>
