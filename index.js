@@ -147,12 +147,186 @@ runMigration();
 // --- GLOBAL NODEMAILER INITIALIZATION ---
 const nodemailer = require('nodemailer');
 const transporter = nodemailer.createTransport({
-  service: 'gmail',
+  host: process.env.SMTP_HOST || 'smtp.hostinger.com',
+  port: parseInt(process.env.SMTP_PORT) || 465,
+  secure: true, // Use SSL
   auth: {
     user: process.env.ADMIN_EMAIL,
     pass: process.env.ADMIN_EMAIL_PASS
   }
 });
+
+// Verification of transporter
+transporter.verify((error, success) => {
+  if (error) {
+    console.log('❌ Mail Server Connection Error:', error);
+  } else {
+    console.log('✅ Mail Server is ready to send notifications');
+  }
+});
+
+const sendConfirmationEmail = async (data) => {
+  const { 
+    type, email, firstName, lastName, suiteTitle, totalCost, checkIn, checkOut, 
+    giftRecipientEmail, giftRecipientName, giftMessage, extras 
+  } = data;
+
+  const isGift = type === 'gift';
+  
+  // Parse Extras for the email body
+  let extrasList = [];
+  if (extras) {
+    const ex = typeof extras === 'string' ? JSON.parse(extras) : extras;
+    if (ex.basic_breakfast) extrasList.push("Basic Breakfast Package");
+    if (ex.deluxe_breakfast) extrasList.push("Deluxe Breakfast Package");
+    if (ex.shabbos_package) extrasList.push("Shabbos Catering Package");
+    if (ex.full_shabbos) extrasList.push("Full Shabbos Package");
+    if (ex.late_checkout_1) extrasList.push("Late Checkout (1:00 PM)");
+    if (ex.late_checkout_2) extrasList.push("Late Checkout (3:00 PM)");
+  }
+
+  const logoUrl = "https://malon-suites.com/assets/images/malon-logo.png"; // Update with actual live logo URL
+
+  // 1. Template for the Buyer
+  const buyerTemplate = `
+    <div style="font-family: 'Helvetica Neue', Helvetica, Arial, sans-serif; max-width: 600px; margin: 0 auto; border: 1px solid #e2e2e2; padding: 40px; color: #333; line-height: 1.6;">
+      <div style="text-align: center; margin-bottom: 40px;">
+        <img src="${logoUrl}" alt="Malon Luxury Suites" style="max-width: 150px; margin-bottom: 20px;" />
+        <h1 style="color: #9B804E; font-size: 24px; letter-spacing: 2px; text-transform: uppercase; margin: 0;">Malon Luxury Suites</h1>
+        <div style="height: 1px; width: 60px; background-color: #9B804E; margin: 20px auto;"></div>
+      </div>
+      
+      <h2 style="font-size: 20px; font-weight: normal; margin-bottom: 20px; color: #1a1a1a;">Confirmation of ${isGift ? 'Gift Purchase' : 'Stay'}</h2>
+      <p>Dear ${firstName} ${lastName},</p>
+      <p>Thank you for choosing Malon Luxury Suites. We are delighted to confirm your ${isGift ? 'gift purchase' : 'booking'} at <strong>${suiteTitle}</strong>.</p>
+      
+      <div style="background-color: #fcf9f2; padding: 30px; margin: 30px 0; border-radius: 4px; border: 1px solid #f0e6d2;">
+        <h3 style="margin-top: 0; color: #9B804E; font-size: 13px; text-transform: uppercase; letter-spacing: 1px; border-bottom: 1px solid #f0e6d2; padding-bottom: 10px; margin-bottom: 15px;">Reservation Summary</h3>
+        
+        <table style="width: 100%; font-size: 14px;">
+          <tr>
+            <td style="padding: 5px 0; color: #666; width: 120px;">Location:</td>
+            <td style="padding: 5px 0; font-weight: bold;">${suiteTitle}</td>
+          </tr>
+          ${!isGift ? `
+          <tr>
+            <td style="padding: 5px 0; color: #666;">Dates:</td>
+            <td style="padding: 5px 0; font-weight: bold;">${checkIn} — ${checkOut}</td>
+          </tr>
+          ` : ''}
+          <tr>
+            <td style="padding: 5px 0; color: #666;">Total Paid:</td>
+            <td style="padding: 5px 0; font-weight: bold; color: #9B804E;">$${totalCost}</td>
+          </tr>
+          ${extrasList.length > 0 ? `
+          <tr>
+            <td style="padding: 5px 0; color: #666; vertical-align: top;">Add-ons:</td>
+            <td style="padding: 5px 0; font-weight: bold;">
+              <ul style="margin: 0; padding-left: 18px;">
+                ${extrasList.map(item => `<li>${item}</li>`).join('')}
+              </ul>
+            </td>
+          </tr>
+          ` : ''}
+          ${isGift ? `
+          <tr>
+            <td style="padding: 5px 0; color: #666;">Gifted To:</td>
+            <td style="padding: 5px 0; font-weight: bold;">${giftRecipientName} (${giftRecipientEmail})</td>
+          </tr>
+          ` : ''}
+        </table>
+      </div>
+
+      <div style="margin: 30px 0; font-size: 14px; color: #555;">
+        <p><strong>Check-in Info:</strong> Check-in is at 4:00 PM. Access codes will be sent via text on the day of your arrival.</p>
+        <p><strong>Address:</strong> You will receive the exact suite address and parking instructions in a follow-up message.</p>
+      </div>
+
+      <p style="font-size: 14px;">If you have any questions, please feel free to reply to this email or call us at <strong>908-94-MALON</strong>.</p>
+      
+      <div style="margin-top: 40px; padding-top: 20px; border-top: 1px solid #eee; font-size: 11px; color: #999; text-align: center; text-transform: uppercase; letter-spacing: 1px;">
+        <p>© 2026 Malon Luxury Suites | Lakewood, NJ</p>
+      </div>
+    </div>
+  `;
+
+  // 2. Recipient Template remains similar but with logo
+  const recipientTemplate = isGift ? `
+    <div style="font-family: 'Helvetica Neue', Helvetica, Arial, sans-serif; max-width: 600px; margin: 0 auto; border: 1px solid #e2e2e2; padding: 40px; color: #333;">
+      <div style="text-align: center; margin-bottom: 40px;">
+        <img src="${logoUrl}" alt="Malon Luxury Suites" style="max-width: 120px; margin-bottom: 20px;" />
+        <h1 style="color: #9B804E; font-size: 26px; letter-spacing: 2px; text-transform: uppercase;">A Special Gift</h1>
+        <div style="height: 1px; width: 60px; background-color: #9B804E; margin: 20px auto;"></div>
+      </div>
+      
+      <p>Dear ${giftRecipientName},</p>
+      <p>We are excited to share that <strong>${firstName} ${lastName}</strong> has gifted you an exclusive experience at Malon Luxury Suites.</p>
+      
+      <div style="background-color: #fcf9f2; padding: 30px; margin: 30px 0; border-radius: 4px; text-align: center; border: 1px solid #f0e6d2;">
+        <h3 style="margin-top: 0; color: #9B804E; font-size: 16px; text-transform: uppercase; letter-spacing: 1px;">${suiteTitle}</h3>
+        <div style="font-style: italic; margin-top: 20px; color: #555; border-left: 3px solid #9B804E; padding-left: 20px; text-align: left;">
+          "${giftMessage || 'A special gift for a beautiful Sheva Brachos week.'}"
+        </div>
+      </div>
+
+      <p>To schedule your stay, please contact us at your convenience.</p>
+      <p style="text-align: center; margin-top: 40px;">
+        <a href="https://malon-suites.com" style="background-color: #9B804E; color: white; padding: 15px 30px; text-decoration: none; border-radius: 2px; font-weight: bold; text-transform: uppercase; font-size: 12px; letter-spacing: 1px;">Explore Malon</a>
+      </p>
+      
+      <div style="margin-top: 60px; padding-top: 20px; border-top: 1px solid #eee; font-size: 11px; color: #999; text-align: center;">
+        <p>© 2026 Malon Luxury Suites | Lakewood, NJ</p>
+      </div>
+    </div>
+  ` : null;
+
+  try {
+    // FETCH ADMIN EMAIL FROM DATABASE DYNAMICALLY
+    const { rows: settingsRows } = await db.query("SELECT value FROM global_settings WHERE key = 'admin_notification_email'");
+    const dynamicAdminEmail = settingsRows.length > 0 ? settingsRows[0].value : process.env.ADMIN_EMAIL;
+
+    // Send to Buyer
+    await transporter.sendMail({
+      from: `"Malon Luxury Suites" <${process.env.ADMIN_EMAIL}>`,
+      to: email,
+      subject: isGift ? `Receipt: Your Gift to ${giftRecipientName}` : `Confirmation: Your Stay at ${suiteTitle}`,
+      html: buyerTemplate
+    });
+
+    // Send to Recipient if Gift
+    if (isGift && giftRecipientEmail) {
+      await transporter.sendMail({
+        from: `"Malon Luxury Suites" <${process.env.ADMIN_EMAIL}>`,
+        to: giftRecipientEmail,
+        subject: `A Luxury Gift from ${firstName} ${lastName}`,
+        html: recipientTemplate
+      });
+    }
+
+    // Admin Notification
+    if (dynamicAdminEmail) {
+      await transporter.sendMail({
+        from: `"Malon System" <${process.env.ADMIN_EMAIL}>`,
+        to: dynamicAdminEmail,
+        subject: `🎉 New ${isGift ? 'Gift' : 'Booking'} Received: ${suiteTitle}`,
+        html: `
+          <div style="font-family: sans-serif; padding: 20px; border: 1px solid #eee;">
+            <h2 style="color: #9B804E;">New Order Received</h2>
+            <p><strong>Customer:</strong> ${firstName} ${lastName}</p>
+            <p><strong>Location:</strong> ${suiteTitle}</p>
+            <p><strong>Total:</strong> $${totalCost}</p>
+            ${extrasList.length > 0 ? `<p><strong>Extras:</strong> ${extrasList.join(', ')}</p>` : ''}
+            <p>Please check the admin dashboard for full details.</p>
+          </div>
+        `
+      });
+    }
+    
+    console.log(`✉️ Confirmation emails sent successfully! (Admin: ${dynamicAdminEmail})`);
+  } catch (err) {
+    console.error('❌ Failed to send confirmation email:', err.message);
+  }
+};
 
 // Multer Storage Configuration
 const storage = multer.diskStorage({
@@ -200,32 +374,29 @@ app.post('/api/webhook', express.raw({ type: 'application/json' }), async (req, 
           console.log(`✅ Booking #${booking_id} updated to PAID in Database!`);
         }
 
-        // --- 2. FIRE THE ADMINISTRATIVE NOTIFICATION ---
-/* 
-        if (process.env.ADMIN_EMAIL && process.env.ADMIN_EMAIL_PASS && first_name) {
-          transporter.sendMail({
-            from: `Malon Booking System <${process.env.ADMIN_EMAIL}>`,
-            to: process.env.ADMIN_EMAIL,
-            replyTo: email,
-            subject: `🎉 NEW SECURE BOOKING: ${suite_id} by ${first_name} ${last_name}!`,
-            html: `
-              <div style="font-family: sans-serif; color: #333; max-width: 600px; padding: 20px; border: 1px solid #eee; border-radius: 5px;">
-                <h2 style="color: #A68A57; border-bottom: 2px solid #A68A57; padding-bottom: 10px;">Payment Confirmed via Stripe Webhook!</h2>
-                <p><strong>Suite:</strong> ${suite_id}</p>
-                <p><strong>Customer:</strong> ${first_name} ${last_name}</p>
-                <p><strong>Email:</strong> ${email}</p>
-                <p><strong>Phone:</strong> ${phone}</p>
-                <p><strong>Dates:</strong> ${check_in} to ${check_out}</p>
-                <p><strong>Total Paid:</strong> $${(paymentIntent.amount / 100).toFixed(2)}</p>
-                <br/>
-                <p style="font-size: 13px; color: #666; font-style: italic;">
-                  Verified receipt via Stripe. Funds have cleanly settled.
-                </p>
-              </div>
-            `
-          }).catch(err => console.error("Webhook Email Delivery Failed:", err.message));
-        }
-        */
+        // --- 2. SEND AUTOMATED CONFIRMATION EMAILS ---
+        const { 
+          type, 
+          gift_recipient_email, 
+          gift_recipient_name, 
+          gift_message,
+          total_cost // Passed in metadata usually as string
+        } = paymentIntent.metadata || {};
+
+        await sendConfirmationEmail({
+          type: type || 'stay',
+          email,
+          firstName: first_name,
+          lastName: last_name,
+          suiteTitle: suite_id, // Metadata often stores ID or Title
+          totalCost: total_cost || (paymentIntent.amount / 100).toFixed(2),
+          checkIn,
+          checkOut,
+          giftRecipientEmail: gift_recipient_email,
+          giftRecipientName: gift_recipient_name,
+          giftMessage: gift_message
+        });
+
       } catch (err) {
         console.error("Webhook Processing Error:", err.message);
       }
@@ -418,6 +589,21 @@ app.post('/api/bookings', async (req, res) => {
       ]
     );
 
+    // --- TRIGGER EMAIL NOTIFICATION FOR MANUAL/CASH BOOKINGS ---
+    await sendConfirmationEmail({
+      type: req.body.type || 'stay',
+      email: email,
+      firstName: first_name,
+      lastName: last_name,
+      suiteTitle: suite_id,
+      totalCost: total_cost,
+      checkIn: check_in,
+      checkOut: check_out,
+      giftRecipientEmail: req.body.giftRecipientEmail,
+      giftRecipientName: req.body.giftRecipientName,
+      giftMessage: req.body.giftMessage
+    });
+
     res.status(201).json(rows[0]);
   } catch (err) {
     console.error(`API ERROR [${req.method} ${req.path}]:`, err.message);
@@ -516,12 +702,8 @@ app.get('/api/settings', async (req, res) => {
 app.post('/api/settings', async (req, res) => {
   const settings = req.body;
   try {
-    const queries = Object.entries(settings).map(([key, value]) =>
-      db.query('INSERT INTO global_settings (key, value) VALUES ($1, $2) ON CONFLICT (key) DO NOTHING UPDATE SET value = EXCLUDED.value', [key, value])
-    );
-    // Wait, ON CONFLICT DO UPDATE needs right syntax
     const upsertQueries = Object.entries(settings).map(([key, value]) =>
-      db.query('INSERT INTO global_settings (key, value) VALUES ($1, $2) ON CONFLICT (key) DO UPDATE SET value = $2', [key, value])
+      db.query('INSERT INTO global_settings (key, value) VALUES ($1, $2) ON CONFLICT (key) DO UPDATE SET value = EXCLUDED.value', [key, value])
     );
     await Promise.all(upsertQueries);
     res.json({ message: 'Settings updated successfully' });
@@ -542,7 +724,10 @@ app.post('/api/upload', upload.single('image'), (req, res) => {
 const stripe = require('stripe')(process.env.STRIPE_SECRET_KEY || 'sk_test_placeholder');
 
 app.post('/api/create-payment-intent', async (req, res) => {
-  const { total_cost, suite_id, first_name, last_name, email, phone, check_in, check_out, booking_id } = req.body;
+  const { 
+    total_cost, suite_id, first_name, last_name, email, phone, check_in, check_out, booking_id,
+    type, giftRecipientName, giftRecipientEmail, giftMessage
+  } = req.body;
 
   if (!total_cost || total_cost <= 0) {
     return res.status(400).json({ error: 'Invalid checkout amount' });
@@ -553,14 +738,19 @@ app.post('/api/create-payment-intent', async (req, res) => {
       amount: Math.round(total_cost * 100),
       currency: 'usd',
       metadata: {
-        booking_id, // CRITICAL: Link this intent directly back to our database record!
+        booking_id,
         suite_id,
         first_name,
         last_name,
         email,
         phone,
         check_in,
-        check_out
+        check_out,
+        total_cost: String(total_cost),
+        type: type || 'stay',
+        gift_recipient_name: giftRecipientName || '',
+        gift_recipient_email: giftRecipientEmail || '',
+        gift_message: giftMessage || ''
       },
       automatic_payment_methods: {
         enabled: true,
