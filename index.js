@@ -211,7 +211,7 @@ const sendConfirmationEmail = async (data) => {
           ${!isGift ? `
           <tr>
             <td style="padding: 5px 0; color: #666;">Dates:</td>
-            <td style="padding: 5px 0; font-weight: bold;">${checkIn} — ${checkOut}</td>
+            <td style="padding: 5px 0; font-weight: bold;">${checkIn || 'TBD'} — ${checkOut || 'TBD'}</td>
           </tr>
           ` : ''}
           <tr>
