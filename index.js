@@ -590,19 +590,24 @@ app.post('/api/bookings', async (req, res) => {
     );
 
     // --- TRIGGER EMAIL NOTIFICATION FOR MANUAL/CASH BOOKINGS ---
-    await sendConfirmationEmail({
-      type: req.body.type || 'stay',
-      email: email,
-      firstName: first_name,
-      lastName: last_name,
-      suiteTitle: suite_id,
-      totalCost: total_cost,
-      checkIn: check_in,
-      checkOut: check_out,
-      giftRecipientEmail: req.body.giftRecipientEmail,
-      giftRecipientName: req.body.giftRecipientName,
-      giftMessage: req.body.giftMessage
-    });
+    // Only send immediately if status is 'confirmed' (Cash/Manual)
+    // Stripe bookings have status 'pending' and email is sent via Webhook
+    if (status === 'confirmed' || !req.body.paymentIntentId) {
+      await sendConfirmationEmail({
+        type: req.body.type || 'stay',
+        email: email,
+        firstName: first_name,
+        lastName: last_name,
+        suiteTitle: suite_id,
+        totalCost: total_cost,
+        checkIn: check_in,
+        checkOut: check_out,
+        giftRecipientEmail: req.body.giftRecipientEmail,
+        giftRecipientName: req.body.giftRecipientName,
+        giftMessage: req.body.giftMessage,
+        extras: extras
+      });
+    }
 
     res.status(201).json(rows[0]);
   } catch (err) {
