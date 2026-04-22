@@ -6,6 +6,8 @@
   "scripts": {
     "start": "node index.js",
     "setup": "node setup-db.js",
+    "seed:guide": "node seed_information_guide_data.js",
+    "seed:suites": "node seed_suites_rebuild.js",
     "test": "echo \"Error: no test specified\" && exit 1"
   },
   "keywords": [],
