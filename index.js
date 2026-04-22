@@ -47,12 +47,16 @@ const runMigration = async () => {
           email TEXT NOT NULL,
           mobile TEXT NOT NULL,
           suite_id TEXT REFERENCES suites(id),
-          check_in DATE NOT NULL,
-          check_out DATE NOT NULL,
+          check_in DATE,
+          check_out DATE,
           breakfast_dates JSONB,
           total_cost DECIMAL(10, 2) NOT NULL,
           status TEXT DEFAULT 'pending',
           extras JSONB,
+          type TEXT DEFAULT 'stay',
+          gift_recipient_name TEXT,
+          gift_recipient_email TEXT,
+          gift_message TEXT,
           notes TEXT,
           created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
       );
@@ -102,6 +106,15 @@ const runMigration = async () => {
       ADD COLUMN IF NOT EXISTS price_motzei_shabbos DECIMAL(10, 2),
       ADD COLUMN IF NOT EXISTS price_weekly DECIMAL(10, 2),
       ADD COLUMN IF NOT EXISTS price_monthly DECIMAL(10, 2),
+      ADD COLUMN IF NOT EXISTS price_peak_weekday_one DECIMAL(10, 2),
+      ADD COLUMN IF NOT EXISTS price_peak_weekday_multiple DECIMAL(10, 2),
+      ADD COLUMN IF NOT EXISTS price_peak_shabbos DECIMAL(10, 2),
+      ADD COLUMN IF NOT EXISTS price_peak_motzei_shabbos DECIMAL(10, 2),
+      ADD COLUMN IF NOT EXISTS price_peak_weekly DECIMAL(10, 2),
+      ADD COLUMN IF NOT EXISTS price_peak_monthly DECIMAL(10, 2),
+      ADD COLUMN IF NOT EXISTS shevaluxe_basic_total DECIMAL(10, 2),
+      ADD COLUMN IF NOT EXISTS shevaluxe_signature_total DECIMAL(10, 2),
+      ADD COLUMN IF NOT EXISTS shevaluxe_premium_total DECIMAL(10, 2),
       ADD COLUMN IF NOT EXISTS check_in_info TEXT,
       ADD COLUMN IF NOT EXISTS check_out_info TEXT,
       ADD COLUMN IF NOT EXISTS house_rules TEXT,
@@ -110,7 +123,15 @@ const runMigration = async () => {
       ALTER TABLE bookings
       ADD COLUMN IF NOT EXISTS extras JSONB,
       ADD COLUMN IF NOT EXISTS notes TEXT,
-      ADD COLUMN IF NOT EXISTS payment_intent_id TEXT;
+      ADD COLUMN IF NOT EXISTS payment_intent_id TEXT,
+      ADD COLUMN IF NOT EXISTS type TEXT DEFAULT 'stay',
+      ADD COLUMN IF NOT EXISTS gift_recipient_name TEXT,
+      ADD COLUMN IF NOT EXISTS gift_recipient_email TEXT,
+      ADD COLUMN IF NOT EXISTS gift_message TEXT;
+
+      ALTER TABLE bookings
+      ALTER COLUMN check_in DROP NOT NULL,
+      ALTER COLUMN check_out DROP NOT NULL;
     `);
 
     // Seed default settings if they don't exist
@@ -138,6 +159,7 @@ const runMigration = async () => {
       `);
       console.log("Initial suites seeded.");
     }
+
   } catch (err) {
     console.error("Migration check failed:", err.message);
   }
@@ -443,6 +465,8 @@ app.post('/api/suites', async (req, res) => {
   const {
     id, title, description, base_price, amenities, images, address, location_info, map_embed,
     price_weekday_one, price_weekday_multiple, price_shabbos, price_motzei_shabbos, price_weekly, price_monthly,
+    price_peak_weekday_one, price_peak_weekday_multiple, price_peak_shabbos, price_peak_motzei_shabbos, price_peak_weekly, price_peak_monthly,
+    shevaluxe_basic_total, shevaluxe_signature_total, shevaluxe_premium_total,
     check_in_info, check_out_info, house_rules, cancellation_policy
   } = req.body;
   try {
@@ -450,11 +474,15 @@ app.post('/api/suites', async (req, res) => {
       `INSERT INTO suites (
         id, title, description, base_price, amenities, images, address, location_info, map_embed,
         price_weekday_one, price_weekday_multiple, price_shabbos, price_motzei_shabbos, price_weekly, price_monthly,
+        price_peak_weekday_one, price_peak_weekday_multiple, price_peak_shabbos, price_peak_motzei_shabbos, price_peak_weekly, price_peak_monthly,
+        shevaluxe_basic_total, shevaluxe_signature_total, shevaluxe_premium_total,
         check_in_info, check_out_info, house_rules, cancellation_policy
-      ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17, $18, $19) RETURNING *`,
+      ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17, $18, $19, $20, $21, $22, $23, $24, $25, $26, $27, $28) RETURNING *`,
       [
         id, title, description, base_price, JSON.stringify(amenities), JSON.stringify(images), address, location_info, map_embed,
         parseNumeric(price_weekday_one), parseNumeric(price_weekday_multiple), parseNumeric(price_shabbos), parseNumeric(price_motzei_shabbos), parseNumeric(price_weekly), parseNumeric(price_monthly),
+        parseNumeric(price_peak_weekday_one), parseNumeric(price_peak_weekday_multiple), parseNumeric(price_peak_shabbos), parseNumeric(price_peak_motzei_shabbos), parseNumeric(price_peak_weekly), parseNumeric(price_peak_monthly),
+        parseNumeric(shevaluxe_basic_total), parseNumeric(shevaluxe_signature_total), parseNumeric(shevaluxe_premium_total),
         check_in_info, check_out_info, house_rules, cancellation_policy
       ]
     );
@@ -469,6 +497,8 @@ app.put('/api/suites/:id', async (req, res) => {
   const {
     title, description, base_price, amenities, images, address, location_info, map_embed,
     price_weekday_one, price_weekday_multiple, price_shabbos, price_motzei_shabbos, price_weekly, price_monthly,
+    price_peak_weekday_one, price_peak_weekday_multiple, price_peak_shabbos, price_peak_motzei_shabbos, price_peak_weekly, price_peak_monthly,
+    shevaluxe_basic_total, shevaluxe_signature_total, shevaluxe_premium_total,
     check_in_info, check_out_info, house_rules, cancellation_policy
   } = req.body;
   try {
@@ -476,11 +506,15 @@ app.put('/api/suites/:id', async (req, res) => {
       `UPDATE suites SET 
         title = $1, description = $2, base_price = $3, amenities = $4, images = $5, address = $6, location_info = $7, map_embed = $8,
         price_weekday_one = $9, price_weekday_multiple = $10, price_shabbos = $11, price_motzei_shabbos = $12, price_weekly = $13, price_monthly = $14,
-        check_in_info = $15, check_out_info = $16, house_rules = $17, cancellation_policy = $18
-      WHERE id = $19 RETURNING *`,
+        price_peak_weekday_one = $15, price_peak_weekday_multiple = $16, price_peak_shabbos = $17, price_peak_motzei_shabbos = $18, price_peak_weekly = $19, price_peak_monthly = $20,
+        shevaluxe_basic_total = $21, shevaluxe_signature_total = $22, shevaluxe_premium_total = $23,
+        check_in_info = $24, check_out_info = $25, house_rules = $26, cancellation_policy = $27
+      WHERE id = $28 RETURNING *`,
       [
         title, description, base_price, JSON.stringify(amenities), JSON.stringify(images), address, location_info, map_embed,
         parseNumeric(price_weekday_one), parseNumeric(price_weekday_multiple), parseNumeric(price_shabbos), parseNumeric(price_motzei_shabbos), parseNumeric(price_weekly), parseNumeric(price_monthly),
+        parseNumeric(price_peak_weekday_one), parseNumeric(price_peak_weekday_multiple), parseNumeric(price_peak_shabbos), parseNumeric(price_peak_motzei_shabbos), parseNumeric(price_peak_weekly), parseNumeric(price_peak_monthly),
+        parseNumeric(shevaluxe_basic_total), parseNumeric(shevaluxe_signature_total), parseNumeric(shevaluxe_premium_total),
         check_in_info, check_out_info, house_rules, cancellation_policy, req.params.id
       ]
     );
@@ -573,28 +607,30 @@ app.get('/api/bookings', async (req, res) => {
 app.post('/api/bookings', async (req, res) => {
   const {
     first_name, last_name, email, mobile, suite_id, check_in, check_out,
-    breakfast_dates, total_cost, status, extras, notes
+    breakfast_dates, total_cost, status, extras, notes,
+    type, giftRecipientName, giftRecipientEmail, giftMessage
   } = req.body;
 
   try {
     const { rows } = await db.query(
       `INSERT INTO bookings (
         first_name, last_name, email, mobile, suite_id, check_in, check_out, 
-        breakfast_dates, total_cost, status, extras, notes
-      ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12) RETURNING *`,
+        breakfast_dates, total_cost, status, extras, notes, type,
+        gift_recipient_name, gift_recipient_email, gift_message
+      ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16) RETURNING *`,
       [
         first_name, last_name, email, mobile, suite_id, check_in, check_out,
         JSON.stringify(breakfast_dates), total_cost, status || 'pending',
-        extras, notes
+        extras, notes, type || 'stay', giftRecipientName || null, giftRecipientEmail || null, giftMessage || null
       ]
     );
 
     // --- TRIGGER EMAIL NOTIFICATION FOR MANUAL/CASH BOOKINGS ---
     // Only send immediately if status is 'confirmed' (Cash/Manual)
     // Stripe bookings have status 'pending' and email is sent via Webhook
-    if (status === 'confirmed' || !req.body.paymentIntentId) {
+    if (status === 'confirmed') {
       await sendConfirmationEmail({
-        type: req.body.type || 'stay',
+        type: type || 'stay',
         email: email,
         firstName: first_name,
         lastName: last_name,
@@ -602,9 +638,9 @@ app.post('/api/bookings', async (req, res) => {
         totalCost: total_cost,
         checkIn: check_in,
         checkOut: check_out,
-        giftRecipientEmail: req.body.giftRecipientEmail,
-        giftRecipientName: req.body.giftRecipientName,
-        giftMessage: req.body.giftMessage,
+        giftRecipientEmail,
+        giftRecipientName,
+        giftMessage,
         extras: extras
       });
     }
