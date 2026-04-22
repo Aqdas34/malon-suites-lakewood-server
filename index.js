@@ -204,16 +204,20 @@ const sendConfirmationEmail = async (data) => {
     // Keep original suiteTitle if lookup fails
   }
   
-  // Parse Extras for the email body
+  // Parse Extras for the email body (never block email send if parsing fails)
   let extrasList = [];
   if (extras) {
-    const ex = typeof extras === 'string' ? JSON.parse(extras) : extras;
-    if (ex.basic_breakfast) extrasList.push("Basic Breakfast Package");
-    if (ex.deluxe_breakfast) extrasList.push("Deluxe Breakfast Package");
-    if (ex.shabbos_package) extrasList.push("Shabbos Catering Package");
-    if (ex.full_shabbos) extrasList.push("Full Shabbos Package");
-    if (ex.late_checkout_1) extrasList.push("Late Checkout (12:00 PM)");
-    if (ex.late_checkout_2) extrasList.push("Late Checkout (1:00 PM)");
+    try {
+      const ex = typeof extras === 'string' ? JSON.parse(extras) : extras;
+      if (ex?.basic_breakfast) extrasList.push("Basic Breakfast Package");
+      if (ex?.deluxe_breakfast) extrasList.push("Deluxe Breakfast Package");
+      if (ex?.shabbos_package) extrasList.push("Shabbos Catering Package");
+      if (ex?.full_shabbos) extrasList.push("Full Shabbos Package");
+      if (ex?.late_checkout_1) extrasList.push("Late Checkout (12:00 PM)");
+      if (ex?.late_checkout_2) extrasList.push("Late Checkout (1:00 PM)");
+    } catch (parseErr) {
+      console.error('⚠️ Extras parsing failed; continuing email send:', parseErr.message, 'raw extras:', extras);
+    }
   }
 
   const logoUrl = "https://malon-suites.com/assets/images/malon-logo.png"; // Update with actual live logo URL
@@ -355,7 +359,13 @@ const sendConfirmationEmail = async (data) => {
     
     console.log(`✉️ Confirmation emails sent successfully! (Admin: ${dynamicAdminEmail})`);
   } catch (err) {
-    console.error('❌ Failed to send confirmation email:', err.message);
+    console.error('❌ Failed to send confirmation email:', err.message, {
+      to: email,
+      giftRecipientEmail,
+      adminEmailConfigured: Boolean(process.env.ADMIN_EMAIL),
+      smtpHost: process.env.SMTP_HOST || 'smtp.hostinger.com',
+      smtpPort: process.env.SMTP_PORT || 465
+    });
   }
 };
 
@@ -411,7 +421,8 @@ app.post('/api/webhook', express.raw({ type: 'application/json' }), async (req, 
           gift_recipient_email, 
           gift_recipient_name, 
           gift_message,
-          total_cost // Passed in metadata usually as string
+          total_cost, // Passed in metadata usually as string
+          extras
         } = paymentIntent.metadata || {};
 
         await sendConfirmationEmail({
@@ -425,7 +436,8 @@ app.post('/api/webhook', express.raw({ type: 'application/json' }), async (req, 
           checkOut,
           giftRecipientEmail: gift_recipient_email,
           giftRecipientName: gift_recipient_name,
-          giftMessage: gift_message
+          giftMessage: gift_message,
+          extras
         });
 
       } catch (err) {
@@ -789,7 +801,7 @@ const stripe = require('stripe')(process.env.STRIPE_SECRET_KEY || 'sk_test_place
 app.post('/api/create-payment-intent', async (req, res) => {
   const { 
     total_cost, suite_id, first_name, last_name, email, phone, check_in, check_out, booking_id,
-    type, giftRecipientName, giftRecipientEmail, giftMessage
+    type, giftRecipientName, giftRecipientEmail, giftMessage, extras
   } = req.body;
 
   if (!total_cost || total_cost <= 0) {
@@ -813,7 +825,8 @@ app.post('/api/create-payment-intent', async (req, res) => {
         type: type || 'stay',
         gift_recipient_name: giftRecipientName || '',
         gift_recipient_email: giftRecipientEmail || '',
-        gift_message: giftMessage || ''
+        gift_message: giftMessage || '',
+        extras: typeof extras === 'string' ? extras : JSON.stringify(extras || {})
       },
       automatic_payment_methods: {
         enabled: true,
