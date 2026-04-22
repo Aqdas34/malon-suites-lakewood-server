@@ -621,6 +621,19 @@ app.post('/api/bookings', async (req, res) => {
   } = req.body;
 
   try {
+    let safeSuiteId = suite_id || null;
+    if (safeSuiteId) {
+      const suiteCheck = await db.query('SELECT 1 FROM suites WHERE id = $1 LIMIT 1', [safeSuiteId]);
+      if (suiteCheck.rows.length === 0) {
+        if ((type || 'stay') === 'gift') {
+          // Gift purchases can be detached from a specific suite ID and scheduled later.
+          safeSuiteId = null;
+        } else {
+          return res.status(400).json({ error: `Invalid suite_id: ${safeSuiteId}` });
+        }
+      }
+    }
+
     const { rows } = await db.query(
       `INSERT INTO bookings (
         first_name, last_name, email, mobile, suite_id, check_in, check_out, 
@@ -628,7 +641,7 @@ app.post('/api/bookings', async (req, res) => {
         gift_recipient_name, gift_recipient_email, gift_message
       ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16) RETURNING *`,
       [
-        first_name, last_name, email, mobile, suite_id, check_in, check_out,
+        first_name, last_name, email, mobile, safeSuiteId, check_in, check_out,
         JSON.stringify(breakfast_dates), total_cost, status || 'pending',
         extras, notes, type || 'stay', giftRecipientName || null, giftRecipientEmail || null, giftMessage || null
       ]
