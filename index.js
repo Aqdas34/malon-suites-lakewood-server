@@ -190,7 +190,7 @@ transporter.verify((error, success) => {
 const sendConfirmationEmail = async (data) => {
   const { 
     type, email, firstName, lastName, suiteTitle, totalCost, checkIn, checkOut, 
-    giftRecipientEmail, giftRecipientName, giftMessage, extras 
+    giftRecipientEmail, giftRecipientName, giftMessage, extras, mobile 
   } = data;
 
   const isGift = type === 'gift';
@@ -201,28 +201,25 @@ const sendConfirmationEmail = async (data) => {
       displaySuiteTitle = suiteLookup.rows[0].title;
     }
   } catch (e) {
-    // Keep original suiteTitle if lookup fails
+    // Keep original suiteTitle
   }
   
-  // Parse Extras for the email body (never block email send if parsing fails)
   let extrasList = [];
   if (extras) {
     try {
       const ex = typeof extras === 'string' ? JSON.parse(extras) : extras;
-      if (ex?.basic_breakfast) extrasList.push("Basic Breakfast Package");
-      if (ex?.deluxe_breakfast) extrasList.push("Deluxe Breakfast Package");
-      if (ex?.shabbos_package) extrasList.push("Shabbos Catering Package");
-      if (ex?.full_shabbos) extrasList.push("Full Shabbos Package");
+      if (ex?.basic_breakfast) extrasList.push("Basic Breakfast Package ($60)");
+      if (ex?.deluxe_breakfast) extrasList.push("Deluxe Breakfast Package ($100)");
+      if (ex?.shabbos_package || ex?.full_shabbos) extrasList.push("Full Shabbos Catering Package ($250)");
       if (ex?.late_checkout_1) extrasList.push("Late Checkout (12:00 PM)");
       if (ex?.late_checkout_2) extrasList.push("Late Checkout (1:00 PM)");
     } catch (parseErr) {
-      console.error('⚠️ Extras parsing failed; continuing email send:', parseErr.message, 'raw extras:', extras);
+      console.error('⚠️ Extras parsing failed:', parseErr.message);
     }
   }
 
-  const logoUrl = "https://malon-suites.com/assets/images/malon-logo.png"; // Update with actual live logo URL
+  const logoUrl = "https://malon-suites.com/assets/logo.png"; 
 
-  // 1. Template for the Buyer
   const buyerTemplate = `
     <div style="font-family: 'Helvetica Neue', Helvetica, Arial, sans-serif; max-width: 600px; margin: 0 auto; border: 1px solid #e2e2e2; padding: 40px; color: #333; line-height: 1.6;">
       <div style="text-align: center; margin-bottom: 40px;">
@@ -243,7 +240,12 @@ const sendConfirmationEmail = async (data) => {
             <td style="padding: 5px 0; color: #666; width: 120px;">Location:</td>
             <td style="padding: 5px 0; font-weight: bold;">${displaySuiteTitle}</td>
           </tr>
-          ${!isGift ? `
+          ${isGift && checkIn ? `
+          <tr>
+            <td style="padding: 5px 0; color: #666;">Wedding Date:</td>
+            <td style="padding: 5px 0; font-weight: bold;">${checkIn}</td>
+          </tr>
+          ` : !isGift ? `
           <tr>
             <td style="padding: 5px 0; color: #666;">Dates:</td>
             <td style="padding: 5px 0; font-weight: bold;">${checkIn || 'TBD'} — ${checkOut || 'TBD'}</td>
@@ -273,8 +275,11 @@ const sendConfirmationEmail = async (data) => {
       </div>
 
       <div style="margin: 30px 0; font-size: 14px; color: #555;">
-        <p><strong>Check-in Info:</strong> Check-in is at 4:00 PM. Access codes will be sent via text on the day of your arrival.</p>
-        <p><strong>Address:</strong> You will receive the exact suite address and parking instructions in a follow-up message.</p>
+        <p><strong>Next Steps:</strong></p>
+        <ul style="padding-left: 20px;">
+          <li>Final arrival instructions and access codes will be sent to this email address on the day of your check-in.</li>
+          <li>Our concierge team is available to assist with any special requests.</li>
+        </ul>
       </div>
 
       <p style="font-size: 14px;">If you have any questions, please feel free to reply to this email or call us at <strong>908-94-MALON</strong>.</p>
@@ -285,38 +290,7 @@ const sendConfirmationEmail = async (data) => {
     </div>
   `;
 
-  // 2. Recipient Template remains similar but with logo
-  const recipientTemplate = isGift ? `
-    <div style="font-family: 'Helvetica Neue', Helvetica, Arial, sans-serif; max-width: 600px; margin: 0 auto; border: 1px solid #e2e2e2; padding: 40px; color: #333;">
-      <div style="text-align: center; margin-bottom: 40px;">
-        <img src="${logoUrl}" alt="Malon Luxury Suites" style="max-width: 120px; margin-bottom: 20px;" />
-        <h1 style="color: #9B804E; font-size: 26px; letter-spacing: 2px; text-transform: uppercase;">A Special Gift</h1>
-        <div style="height: 1px; width: 60px; background-color: #9B804E; margin: 20px auto;"></div>
-      </div>
-      
-      <p>Dear ${giftRecipientName},</p>
-      <p>We are excited to share that <strong>${firstName} ${lastName}</strong> has gifted you an exclusive experience at Malon Luxury Suites.</p>
-      
-      <div style="background-color: #fcf9f2; padding: 30px; margin: 30px 0; border-radius: 4px; text-align: center; border: 1px solid #f0e6d2;">
-        <h3 style="margin-top: 0; color: #9B804E; font-size: 16px; text-transform: uppercase; letter-spacing: 1px;">${suiteTitle}</h3>
-        <div style="font-style: italic; margin-top: 20px; color: #555; border-left: 3px solid #9B804E; padding-left: 20px; text-align: left;">
-          "${giftMessage || 'A special gift for a beautiful Sheva Brachos week.'}"
-        </div>
-      </div>
-
-      <p>To schedule your stay, please contact us at your convenience.</p>
-      <p style="text-align: center; margin-top: 40px;">
-        <a href="https://malon-suites.com" style="background-color: #9B804E; color: white; padding: 15px 30px; text-decoration: none; border-radius: 2px; font-weight: bold; text-transform: uppercase; font-size: 12px; letter-spacing: 1px;">Explore Malon</a>
-      </p>
-      
-      <div style="margin-top: 60px; padding-top: 20px; border-top: 1px solid #eee; font-size: 11px; color: #999; text-align: center;">
-        <p>© 2026 Malon Luxury Suites | Lakewood, NJ</p>
-      </div>
-    </div>
-  ` : null;
-
   try {
-    // FETCH ADMIN EMAIL FROM DATABASE DYNAMICALLY
     const { rows: settingsRows } = await db.query("SELECT value FROM global_settings WHERE key = 'admin_notification_email'");
     const dynamicAdminEmail = settingsRows.length > 0 ? settingsRows[0].value : process.env.ADMIN_EMAIL;
 
@@ -330,6 +304,35 @@ const sendConfirmationEmail = async (data) => {
 
     // Send to Recipient if Gift
     if (isGift && giftRecipientEmail) {
+      const recipientTemplate = `
+        <div style="font-family: 'Helvetica Neue', Helvetica, Arial, sans-serif; max-width: 600px; margin: 0 auto; border: 1px solid #e2e2e2; padding: 40px; color: #333;">
+          <div style="text-align: center; margin-bottom: 40px;">
+            <img src="${logoUrl}" alt="Malon Luxury Suites" style="max-width: 120px; margin-bottom: 20px;" />
+            <h1 style="color: #9B804E; font-size: 26px; letter-spacing: 2px; text-transform: uppercase;">A Special Gift</h1>
+            <div style="height: 1px; width: 60px; background-color: #9B804E; margin: 20px auto;"></div>
+          </div>
+          
+          <p>Dear ${giftRecipientName},</p>
+          <p>We are excited to share that <strong>${firstName} ${lastName}</strong> has gifted you an exclusive experience at Malon Luxury Suites.</p>
+          
+          <div style="background-color: #fcf9f2; padding: 30px; margin: 30px 0; border-radius: 4px; text-align: center; border: 1px solid #f0e6d2;">
+            <h3 style="margin-top: 0; color: #9B804E; font-size: 16px; text-transform: uppercase; letter-spacing: 1px;">${displaySuiteTitle}</h3>
+            <div style="font-style: italic; margin-top: 20px; color: #555; border-left: 3px solid #9B804E; padding-left: 20px; text-align: left;">
+              "${giftMessage || 'A special gift for a beautiful Sheva Brachos week.'}"
+            </div>
+          </div>
+
+          <p>To schedule your stay, please contact us at your convenience.</p>
+          <p style="text-align: center; margin-top: 40px;">
+            <a href="https://malon-suites.com" style="background-color: #9B804E; color: white; padding: 15px 30px; text-decoration: none; border-radius: 2px; font-weight: bold; text-transform: uppercase; font-size: 12px; letter-spacing: 1px;">Explore Malon</a>
+          </p>
+          
+          <div style="margin-top: 60px; padding-top: 20px; border-top: 1px solid #eee; font-size: 11px; color: #999; text-align: center;">
+            <p>© 2026 Malon Luxury Suites | Lakewood, NJ</p>
+          </div>
+        </div>
+      `;
+
       await transporter.sendMail({
         from: `"Malon Luxury Suites" <${process.env.ADMIN_EMAIL}>`,
         to: giftRecipientEmail,
@@ -338,34 +341,32 @@ const sendConfirmationEmail = async (data) => {
       });
     }
 
-    // Admin Notification
+    // Send to Admin
     if (dynamicAdminEmail) {
       await transporter.sendMail({
         from: `"Malon System" <${process.env.ADMIN_EMAIL}>`,
         to: dynamicAdminEmail,
-        subject: `🎉 New ${isGift ? 'Gift' : 'Booking'} Received: ${displaySuiteTitle}`,
+        subject: `🎉 New Order: ${displaySuiteTitle} ($${totalCost})`,
         html: `
           <div style="font-family: sans-serif; padding: 20px; border: 1px solid #eee;">
-            <h2 style="color: #9B804E;">New Order Received</h2>
-            <p><strong>Customer:</strong> ${firstName} ${lastName}</p>
+            <h2 style="color: #9B804E;">New Reservation Received</h2>
+            <p><strong>Customer:</strong> ${firstName} ${lastName} (${email})</p>
+            <p><strong>Mobile:</strong> ${mobile}</p>
+            <p><strong>Type:</strong> ${isGift ? 'Gift (ShevaLuxe)' : 'Stay'}</p>
             <p><strong>Location:</strong> ${displaySuiteTitle}</p>
+            ${!isGift ? `<p><strong>Dates:</strong> ${checkIn} - ${checkOut}</p>` : `<p><strong>Wedding Date:</strong> ${checkIn}</p>`}
             <p><strong>Total:</strong> $${totalCost}</p>
             ${extrasList.length > 0 ? `<p><strong>Extras:</strong> ${extrasList.join(', ')}</p>` : ''}
-            <p>Please check the admin dashboard for full details.</p>
+            ${isGift ? `<p><strong>Recipient:</strong> ${giftRecipientName} (${giftRecipientEmail})</p><p><strong>Message:</strong> ${giftMessage}</p>` : ''}
+            <p><a href="https://malon-suites.com/admin" style="color: #9B804E; font-weight: bold;">View in Admin Dashboard</a></p>
           </div>
         `
       });
     }
     
-    console.log(`✉️ Confirmation emails sent successfully! (Admin: ${dynamicAdminEmail})`);
+    console.log(`✉️ Confirmation emails sent successfully!`);
   } catch (err) {
-    console.error('❌ Failed to send confirmation email:', err.message, {
-      to: email,
-      giftRecipientEmail,
-      adminEmailConfigured: Boolean(process.env.ADMIN_EMAIL),
-      smtpHost: process.env.SMTP_HOST || 'smtp.hostinger.com',
-      smtpPort: process.env.SMTP_PORT || 465
-    });
+    console.error('❌ Failed to send confirmation:', err.message);
   }
 };
 
