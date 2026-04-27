@@ -4,7 +4,6 @@ const db = require('./db');
 const multer = require('multer');
 const path = require('path');
 require('dotenv').config();
-const { Pool } = require('pg');
 const fs = require('fs');
 
 // Ensure the uploads directory exists before accepting images
@@ -16,8 +15,6 @@ if (!fs.existsSync(uploadDir)) {
 const app = express();
 const PORT = process.env.PORT || 5000;
 
-// Use the shared database connection from db.js
-const db = require('./db');
 
 // Auto-migration for missing columns
 const runMigration = async () => {
