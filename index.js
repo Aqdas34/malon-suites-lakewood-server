@@ -16,13 +16,8 @@ if (!fs.existsSync(uploadDir)) {
 const app = express();
 const PORT = process.env.PORT || 5000;
 
-const pool = new Pool({
-  user: process.env.DB_USER,
-  host: process.env.DB_HOST,
-  database: process.env.DB_NAME,
-  password: process.env.DB_PASSWORD || process.env.DB_PASS,
-  port: process.env.DB_PORT,
-});
+// Use the shared database connection from db.js
+const db = require('./db');
 
 // Auto-migration for missing columns
 const runMigration = async () => {
@@ -30,7 +25,7 @@ const runMigration = async () => {
     console.log("Checking and generating missing tables...");
 
     // 1. Create all base tables safely
-    await pool.query(`
+    await db.query(`
       CREATE TABLE IF NOT EXISTS suites (
           id TEXT PRIMARY KEY,
           title TEXT NOT NULL,
@@ -95,7 +90,7 @@ const runMigration = async () => {
     `);
 
     // 2. Perform Alters on Suites if needed
-    await pool.query(`
+    await db.query(`
       ALTER TABLE suites 
       ADD COLUMN IF NOT EXISTS address TEXT,
       ADD COLUMN IF NOT EXISTS location_info TEXT,
@@ -142,16 +137,16 @@ const runMigration = async () => {
       ['refund_policy', 'Full refund 72h before, 50% within 48-72h, no refund after.']
     ];
     for (const [key, val] of defaults) {
-      await pool.query('INSERT INTO global_settings (key, value) VALUES ($1, $2) ON CONFLICT (key) DO NOTHING', [key, val]);
+      await db.query('INSERT INTO global_settings (key, value) VALUES ($1, $2) ON CONFLICT (key) DO NOTHING', [key, val]);
     }
 
     console.log("Database schema is up to date.");
 
     // Ensure initial suites exist
-    const { rowCount } = await pool.query('SELECT * FROM suites');
+    const { rowCount } = await db.query('SELECT * FROM suites');
     if (rowCount === 0) {
       console.log("Seeding initial suites...");
-      await pool.query(`
+      await db.query(`
         INSERT INTO suites (id, title, description, base_price, amenities, images) VALUES
         ('bellinger-st-suites', 'Bellinger Street Suites', 'A hotel suite experience in a home setting.', 325.00, '["Kitchenette", "Wi-Fi", "Free Parking"]', '["assets/images/SEV05322.jpg"]'),
         ('laurel-ave-suite', 'Laurel Avenue Suite', 'A luxuriously maintained suite for families.', 350.00, '["Full Kitchen", "Wi-Fi", "Garden View"]', '["assets/images/SEV05327.jpg"]'),
@@ -492,7 +487,7 @@ app.post('/api/suites', async (req, res) => {
     check_in_info, check_out_info, house_rules, cancellation_policy
   } = req.body;
   try {
-    const { rows } = await pool.query(
+    const { rows } = await db.query(
       `INSERT INTO suites (
         id, title, description, base_price, amenities, images, address, location_info, map_embed,
         price_weekday_one, price_weekday_multiple, price_shabbos, price_motzei_shabbos, price_weekly, price_monthly,
@@ -524,7 +519,8 @@ app.put('/api/suites/:id', async (req, res) => {
     check_in_info, check_out_info, house_rules, cancellation_policy
   } = req.body;
   try {
-    const { rows } = await pool.query(
+    console.log(`Updating suite ${req.params.id} with payload:`, req.body);
+    const { rows } = await db.query(
       `UPDATE suites SET 
         title = $1, description = $2, base_price = $3, amenities = $4, images = $5, address = $6, location_info = $7, map_embed = $8,
         price_weekday_one = $9, price_weekday_multiple = $10, price_shabbos = $11, price_motzei_shabbos = $12, price_weekly = $13, price_monthly = $14,
@@ -540,6 +536,7 @@ app.put('/api/suites/:id', async (req, res) => {
         check_in_info, check_out_info, house_rules, cancellation_policy, req.params.id
       ]
     );
+    console.log(`Update result for ${req.params.id}:`, rows.length > 0 ? "Success" : "Failed (Not Found)");
     if (rows.length === 0) return res.status(404).json({ error: 'Suite not found' });
     res.json(rows[0]);
   } catch (err) {
