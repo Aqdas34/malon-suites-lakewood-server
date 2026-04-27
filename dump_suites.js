@@ -1,7 +1,7 @@
 const db = require('./db');
 async function dump() {
   try {
-    const { rows } = await db.query('SELECT id, title FROM suites');
+    const { rows } = await db.query('SELECT id, title, location_info FROM suites');
     console.log('Suites in DB:', JSON.stringify(rows, null, 2));
     process.exit(0);
   } catch (err) {

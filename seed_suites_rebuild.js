@@ -83,9 +83,15 @@ const SUITES = [
     base_price: 375,
     description:
       'Upscale design with spa-style shower (bench, rain head, jets, handheld spray), private fenced yard with outdoor furniture, and premium coffee brewer.',
-    images: JSON.stringify(['assets/images/SEV05330.jpg']),
+    images: JSON.stringify(['https://malonluxurysuites.com/wp-content/uploads/2023/10/Miller-1-1.jpg']),
     amenities: JSON.stringify(AMENITIES_ALL),
-    address: 'Miller Road, Lakewood, NJ',
+    address: '129 Miller Road, Lakewood, NJ 08701',
+    location_info: JSON.stringify({
+      nearbyShuls: '• Beis Efraim Tzvi (Rav Shemano): Nusach Sefard, heimish, includes men’s mikvah. (1-minute walk, 141 Miller Rd)\n• Beis Elazar (Rav Kahanow): Nusach Ashkenaz. (4-minute walk, 185 Miller Rd)',
+      nearbyShopping: 'Etz Chaim Judaica',
+      nearbyAttractions: 'South Lake Park',
+      nearbyGroceries: 'Kosher West, Minzers'
+    }),
     check_in_info:
       'Standard check-in: 5:00 PM. Early check-in: 1 hour for $50, 2 hours for $75 (earliest 3:00 PM).',
     check_out_info:
@@ -112,9 +118,15 @@ const SUITES = [
     base_price: 295,
     description:
       'Centrally located near the yeshiva area and Ridge, within walking distance to multiple chassidishe shuls (Clover Street area). Newly built with upscale finishes.',
-    images: JSON.stringify(['assets/images/SEV05327.jpg']),
+    images: JSON.stringify(['https://malonluxurysuites.com/wp-content/uploads/2023/10/Laurel-1-1.jpg']),
     amenities: JSON.stringify(AMENITIES_ALL),
-    address: 'Laurel Avenue, Lakewood, NJ',
+    address: '269 Laurel Ave, Lakewood, NJ 08701',
+    location_info: JSON.stringify({
+      nearbyShuls: '• Tefila L’Moshe (Rabbi Flamm): 308 Ocean Ave\n• Bais Medrash Tiferes Pinchos (Rabbi Spiegel): Includes mikvah. (187 E4th St)\n• Bais Hamedrash D’Chasidei Sadi Gur: Includes mikvah. (53 Holly St)\n• Emunas Yisroel: Includes mikvah. (23 Clover St)\n• Or Elimelech (Gutfreund): Approximately 7-minute walk.',
+      nearbyShopping: 'Gourmet Glatt area, Breadberry',
+      nearbyAttractions: 'Pine Park',
+      nearbyGroceries: 'Gourmet Glatt, Breadberry, Evergreen'
+    }),
     check_in_info:
       'Standard check-in: 5:00 PM. Early check-in: 1 hour for $50, 2 hours for $75 (earliest 3:00 PM).',
     check_out_info:
@@ -141,9 +153,15 @@ const SUITES = [
     base_price: 325,
     description:
       'Bellinger location — large windows and abundant natural light. Suite A: Small kitchenette (mini fridge, no oven), standard bathtub.',
-    images: JSON.stringify(['assets/images/SEV05322.jpg']),
+    images: JSON.stringify(['https://malonluxurysuites.com/wp-content/uploads/2023/10/Bellinger-1-1.jpg']),
     amenities: JSON.stringify([...AMENITIES_ALL, AMENITIES_BELLINGER_EXTRA]),
-    address: 'Bellinger Street, Lakewood, NJ',
+    address: '100 Bellinger St, Lakewood, NJ 08701',
+    location_info: JSON.stringify({
+      nearbyShuls: '• Albert Shul: 10-minute walk.\n• N’eemas Hachaim Hall: Located on Bellinger St.\n• Darchei Avoseinu (Rav Avrohom Yehoshua Heschel): 1373 Pine St.',
+      nearbyShopping: 'Pine Street Area Shopping, A.I. Stone',
+      nearbyAttractions: 'Ocean County Park',
+      nearbyGroceries: 'Pine Street Area Groceries (e.g., NPGS nearby)'
+    }),
     check_in_info:
       'Standard check-in: 5:00 PM. Early check-in: 1 hour for $50, 2 hours for $75 (earliest 3:00 PM).',
     check_out_info:
@@ -158,6 +176,8 @@ const SUITES = [
     price_peak_weekday_multiple: 330,
     price_peak_shabbos: 440,
     price_peak_motzei_shabbos: 275,
+    price_weekly: 2150,
+    price_monthly: 7600,
     price_peak_weekly: 2150,
     price_peak_monthly: 7600,
     shevaluxe_basic_total: null,
@@ -170,9 +190,15 @@ const SUITES = [
     base_price: 350,
     description:
       'Bellinger location — large windows and abundant natural light. Suite B: Full kitchenette (oven, large fridge), couch, walk-in shower with bench. ShevaLuxe packages available for this suite.',
-    images: JSON.stringify(['assets/images/SEV05322.jpg']),
+    images: JSON.stringify(['https://malonluxurysuites.com/wp-content/uploads/2023/10/Bellinger-1-1.jpg']),
     amenities: JSON.stringify([...AMENITIES_ALL, AMENITIES_BELLINGER_EXTRA]),
-    address: 'Bellinger Street, Lakewood, NJ',
+    address: '100 Bellinger St, Lakewood, NJ 08701',
+    location_info: JSON.stringify({
+      nearbyShuls: '• Albert Shul: 10-minute walk.\n• N’eemas Hachaim Hall: Located on Bellinger St.\n• Darchei Avoseinu (Rav Avrohom Yehoshua Heschel): 1373 Pine St.',
+      nearbyShopping: 'Pine Street Area Shopping, A.I. Stone',
+      nearbyAttractions: 'Ocean County Park',
+      nearbyGroceries: 'Pine Street Area Groceries (e.g., NPGS nearby)'
+    }),
     check_in_info:
       'Standard check-in: 5:00 PM. Early check-in: 1 hour for $50, 2 hours for $75 (earliest 3:00 PM).',
     check_out_info:
@@ -187,6 +213,8 @@ const SUITES = [
     price_peak_weekday_multiple: 330,
     price_peak_shabbos: 440,
     price_peak_motzei_shabbos: 275,
+    price_weekly: 2150,
+    price_monthly: 7600,
     price_peak_weekly: 2150,
     price_peak_monthly: 7600,
     shevaluxe_basic_total: 2685,
@@ -251,7 +279,7 @@ async function run() {
         s.amenities,
         s.images,
         s.address,
-        null,
+        s.location_info,
         null,
         s.price_weekday_one,
         s.price_weekday_multiple,
