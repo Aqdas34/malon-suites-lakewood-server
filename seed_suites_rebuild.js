@@ -111,6 +111,12 @@ const SUITES = [
     shevaluxe_basic_total: 2845,
     shevaluxe_signature_total: 3020,
     shevaluxe_premium_total: 3170,
+    amenities: JSON.stringify([
+      ...AMENITIES_ALL, 
+      'Private fenced yard with outdoor furniture',
+      'Elite spa-style shower (Rain head, Jets, Handheld)'
+    ]),
+    address: '129 Miller Road, Lakewood, NJ 08701',
   },
   {
     id: 'laurel-ave-suite',
