@@ -480,7 +480,9 @@ app.get(['/health', '/api/health'], (req, res) => {
 // --- SUITES API ---
 app.get('/api/suites', async (req, res) => {
   try {
+    console.log(`🔍 Fetching all suites...`);
     const { rows } = await db.query('SELECT * FROM suites ORDER BY title ASC');
+    console.log(`✅ Retrieved ${rows.length} suites`);
     res.json(rows);
   } catch (err) {
     console.error(`API ERROR [${req.method} ${req.path}]:`, err.message);
@@ -722,7 +724,10 @@ app.post('/api/bookings', async (req, res) => {
 // --- BLOCKED DATES API ---
 app.get('/api/blocked-dates/:suiteId', async (req, res) => {
   try {
-    const { rows } = await db.query("SELECT TO_CHAR(blocked_date, 'YYYY-MM-DD') as date, reason FROM blocked_dates WHERE suite_id = $1", [req.params.suiteId]);
+    const suiteId = req.params.suiteId;
+    console.log(`📅 Fetching blocked dates for suite: ${suiteId}`);
+    const { rows } = await db.query("SELECT TO_CHAR(blocked_date, 'YYYY-MM-DD') as date, reason FROM blocked_dates WHERE suite_id = $1", [suiteId]);
+    console.log(`✅ Found ${rows.length} blocked dates for ${suiteId}`);
     res.json(rows);
   } catch (err) {
     console.error(`API ERROR [${req.method} ${req.path}]:`, err.message);
