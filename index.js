@@ -433,6 +433,25 @@ app.post('/api/webhook', express.raw({ type: 'application/json' }), async (req, 
           extras
         });
 
+        // --- AUTOMATIC BLOCKING FOR SHEVALUXE (Confirmed/Paid via Webhook) ---
+        if (type === 'gift' && suite_id && check_in) {
+          try {
+            const start = new Date(check_in);
+            for (let i = 0; i < 7; i++) {
+              const d = new Date(start);
+              d.setDate(start.getDate() + i);
+              const dateStr = d.toISOString().split('T')[0];
+              await db.query(
+                'INSERT INTO blocked_dates (suite_id, blocked_date, reason) VALUES ($1, $2, $3) ON CONFLICT (suite_id, blocked_date) DO NOTHING',
+                [suite_id, dateStr, `ShevaLuxe Gift (Paid): ${first_name} ${last_name}`]
+              );
+            }
+            console.log(`✅ Automatically blocked 7 nights for ShevaLuxe booking #${booking_id} via Webhook`);
+          } catch (blockErr) {
+            console.error('❌ Failed to auto-block ShevaLuxe dates in Webhook:', blockErr.message);
+          }
+        }
+
       } catch (err) {
         console.error("Webhook Processing Error:", err.message);
       }
@@ -672,6 +691,25 @@ app.post('/api/bookings', async (req, res) => {
         giftMessage,
         extras: extras
       });
+
+      // --- AUTOMATIC BLOCKING FOR SHEVALUXE (Confirmed/Cash) ---
+      if (type === 'gift' && suite_id && check_in) {
+        try {
+          const start = new Date(check_in);
+          for (let i = 0; i < 7; i++) {
+            const d = new Date(start);
+            d.setDate(start.getDate() + i);
+            const dateStr = d.toISOString().split('T')[0];
+            await db.query(
+              'INSERT INTO blocked_dates (suite_id, blocked_date, reason) VALUES ($1, $2, $3) ON CONFLICT (suite_id, blocked_date) DO NOTHING',
+              [suite_id, dateStr, `ShevaLuxe Gift: ${first_name} ${last_name}`]
+            );
+          }
+          console.log(`✅ Automatically blocked 7 nights for ShevaLuxe booking #${rows[0].id}`);
+        } catch (blockErr) {
+          console.error('❌ Failed to auto-block ShevaLuxe dates:', blockErr.message);
+        }
+      }
     }
 
     res.status(201).json(rows[0]);
@@ -684,8 +722,8 @@ app.post('/api/bookings', async (req, res) => {
 // --- BLOCKED DATES API ---
 app.get('/api/blocked-dates/:suiteId', async (req, res) => {
   try {
-    const { rows } = await db.query("SELECT TO_CHAR(blocked_date, 'YYYY-MM-DD') as blocked_date FROM blocked_dates WHERE suite_id = $1", [req.params.suiteId]);
-    res.json(rows.map(r => r.blocked_date));
+    const { rows } = await db.query("SELECT TO_CHAR(blocked_date, 'YYYY-MM-DD') as date, reason FROM blocked_dates WHERE suite_id = $1", [req.params.suiteId]);
+    res.json(rows);
   } catch (err) {
     console.error(`API ERROR [${req.method} ${req.path}]:`, err.message);
     res.status(500).json({ error: err.message });
