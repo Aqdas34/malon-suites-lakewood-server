@@ -458,7 +458,18 @@ app.post('/api/webhook', express.raw({ type: 'application/json' }), async (req, 
       break;
 
     case 'payment_intent.payment_failed':
-      console.log(`❌ Payment visually failed! The customer's card was declined.`);
+      const failedIntent = event.data.object;
+      const failedBookingId = failedIntent.metadata ? failedIntent.metadata.booking_id : null;
+      console.log(`❌ Payment visually failed! The customer's card was declined for booking #${failedBookingId}`);
+      
+      if (failedBookingId) {
+        try {
+          await db.query('UPDATE bookings SET status = $1 WHERE id = $2', ['failed', failedBookingId]);
+          console.log(`📉 Booking #${failedBookingId} marked as FAILED in database.`);
+        } catch (dbErr) {
+          console.error(`❌ Error updating failed status in database:`, dbErr.message);
+        }
+      }
       break;
 
     default:
